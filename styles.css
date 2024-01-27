@@ -1,0 +1,16 @@
+#gameboard {
+
+    display: grid;
+    height: 450px;
+    width: 450px;
+    grid-template-columns: repeat(3, 150px);
+    grid-template-rows: repeat(3, 150px);
+}
+
+#gameboard > div {
+    border: 2px solid goldenrod;
+    display: grid;
+    justify-content: center;
+    align-items: center;
+    font-size: 36px;
+}

@@ -1,38 +1,28 @@
 // Building the Gameboard
 const gameboard = ( function() {
-    const board = [
-        [ null, null, null],
-        [ null, null, null],
-        [ null, null, null]
+    let board = [
+        [ "", "", ""],
+        [ "", "", ""],
+        [ "", "", ""]
     ];
+
     let boardMarks = 0;
     let hasAWinner = false;
+
+    const isCellAvailable = (row, column) => {
+        if (board[row][column] === "") {
+            return true;
+        } else return false; // Should always use return keyword
+    }
+
+    const getBoardArr = () => board;
 
     const getBoardMarks = () => boardMarks;
 
     const getWinner = () => hasAWinner;
     
-    const setMarker = (name, playerMarker) => {
-        do {
-            do {
-                var row = +prompt(`${name}, which row do you want to mark?`);
-                if (isNaN(row) || row < 0 || row > 2) {
-                    alert('Value should be an integer between 0 and 2');
-                }
-            } while (isNaN(row) || row < 0 || row > 2);
-
-            do {
-                var column = +prompt(`${name}, which column do you want to mark?`);
-                if (isNaN(column) || column < 0 || column > 2) {
-                    alert('Value should be an integer between 0 and 2');
-                }
-            } while (isNaN(column) || column < 0 || column > 2);
-            
-            if (board[row][column] !== null) {
-                console.log('Already marked, pick another location!');
-            }
-        } while (board[row][column] !== null)
-
+    const setMarker = (playerMarker, row, column) => {
+        
         board[row][column] = playerMarker;
         boardMarks++;
         console.table(board);
@@ -66,11 +56,10 @@ const gameboard = ( function() {
         }
         console.log(row);
         console.log(column);
-        console.log(row);
 
         if ((row *-1) + 2 === column) {
             for (let i = 0; i < 3; i++) {
-                if (board[2 - i][i]) {
+                if (board[2 - i][i] === playerMarker) {
                     diagonalMarks2++;
                 }
             }
@@ -79,9 +68,22 @@ const gameboard = ( function() {
         if (rowMarks === 3 || columnMarks === 3 || diagonalMarks1 === 3 || diagonalMarks2 === 3) {
             hasAWinner = true;
         }
+
+        // Update board UI
+        displayController.displayUpdatedMarkInBoard(board);
     }
 
-    return { setMarker, getBoardMarks, getWinner }; //I should not return/expose 'board' since I don't want this variable to be freely accessible
+    const reset = () => {
+        board = [
+            [ "", "", ""],
+            [ "", "", ""],
+            [ "", "", ""]
+        ];
+        boardMarks = 0;
+        hasAWinner = false;
+    }
+    
+    return { isCellAvailable, getBoardArr, setMarker, getBoardMarks, getWinner, reset }; //I should not return/expose 'board' since I don't want this variable to be freely accessible
 }) ();
 
 
@@ -93,45 +95,159 @@ function createPlayer() {
 
     const getWinner = () => isWinner;
 
-    const playRound = () => {
-        gameboard.setMarker(name, marker);
+    const playOneRound = (marker, row, column) => {
+        
+        gameboard.setMarker(marker, row, column);
         if (gameboard.getWinner()) {
             isWinner = true;
         }
     }
+
     return {
         name,
         marker,
         getWinner,
-        playRound
+        playOneRound
     }
 }
 
-// Game object
-const game = ( function() {
-    const player1 = createPlayer();
-    const player2 = createPlayer();
-    let isGameOver = false;
 
-    const players = [player1, player2];
+// Game Flow-Logic object
+const game = ( function() {
+
+    let isGameOver = false;
+    let isGameReset = true;
+    let players = [];
+    let turnCounter = 0;
 
     const start = () => {
-        let i = 0;
-        while (!isGameOver) {
-            players[i % 2].playRound();
-            
-            if (players[i % 2].getWinner()) {
-                isGameOver = true;
-                console.log(`${players[i % 2].name} won!`);
-            } else if (gameboard.getBoardMarks() === 9) {
-                isGameOver = true;
-                console.log('Game over! You both suck and tied!');
-            }           
-            i++;
+        isGameReset = false;
+        players.push(createPlayer(), createPlayer());
+
+        displayController.logPlayerTurn(players[turnCounter % 2].name);
+    }
+
+    const getPlayers = () => players;
+
+    const getTurnCounter = () => turnCounter;
+    
+    const roundTurn = (row, column) => {
+        players[turnCounter % 2].playOneRound(players[turnCounter % 2].marker, row, column);
+
+        if (players[turnCounter % 2].getWinner()) {
+            isGameOver = true;
+            displayController.logWinGameOver(players[turnCounter % 2].name);
+        } else if (gameboard.getBoardMarks() === 9) {
+            displayController.logTieGameOver();
         }
+
+        turnCounter++;
+        if (!isGameOver) displayController.logPlayerTurn(players[turnCounter % 2].name);
+        
+    }
+
+    const getIsGameOver = () => isGameOver;
+    const getIsGameReset = () => isGameReset;
+
+    const reset = () => {
+        gameboard.reset();
+        players = [];
+        isGameReset = true;
+        isGameOver = false;
+        turnCounter = 0;
+        displayController.displayUpdatedMarkInBoard(gameboard.getBoardArr());
+        displayController.clearLogger();
     }
 
     return {
+        getPlayers,
+        getTurnCounter,
+        getIsGameReset,
+        getIsGameOver,
         start,
+        roundTurn,
+        reset
+    }
+}) ();
+
+
+// Controller to handle display/DOM logic. Should this Module work similar as console.log work?
+const displayController = (function () {
+    const logger = document.querySelector('#logger');
+    const board = document.querySelectorAll('#gameboard > div');
+
+    logger.textContent = 'Press "Start" brother ...'
+
+    const logBasicText = (text) => {
+        logger.textContent = text;
+    }
+
+    const clearLogger = () => {
+        logger.textContent = '';
+    }
+
+    const logWinGameOver = (name) => {
+        logger.textContent = `${name} won!`;
+    }
+
+    const logTieGameOver = () => {
+        logger.textContent = 'Game over! You both suck and tied!';
+    }
+
+    const logPlayerTurn = (name) => {
+        logger.textContent = `It's ${name}'s turn.`
+    }
+
+    const displayUpdatedMarkInBoard = (boardArr) => {
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                board[(3 * i) + j].textContent = `${boardArr[i][j]}`;
+            }
+        }
+    }
+
+    // Adding event listeners to each cell in the gameboard immediately after being created
+    const boardCells = document.querySelectorAll('#gameboard > div');
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                boardCells[(3 * i) + j].addEventListener('click', () => {
+                    if (game.getIsGameReset() || game.getIsGameOver()) return; // Flag
+                    if (!gameboard.isCellAvailable(i, j)) {
+                        displayController.logBasicText('Already marked, pick another location! ...');
+                        setTimeout(() => {
+                            displayController.logPlayerTurn(game.getPlayers()[game.getTurnCounter() % 2].name)
+                        }, 2000); //TODO: bug, when player selects already marked cell, quickly selects another and win, turn of other player gets displayed in logger.
+                    }   else {
+                        game.roundTurn(i, j);
+                    }
+                });
+            }
+        }
+
+
+    // Start button
+    const startButton = document.querySelector('#start');
+    startButton.addEventListener('click', (e) => {
+        game.start();
+        // TODO: as game started, start button should remain disabled until "reset" button is pressed
+
+        e.target.disabled = true;
+    });
+
+    // Reset
+    const resetButton = document.querySelector('#reset');
+    resetButton.addEventListener('click', () => {
+        game.reset();
+        startButton.disabled = false;
+        displayController.logBasicText('Press "Start" ...')
+    });
+
+    return {
+        logBasicText,
+        clearLogger,
+        logPlayerTurn,
+        displayUpdatedMarkInBoard,
+        logTieGameOver,
+        logWinGameOver
     }
 }) ();
